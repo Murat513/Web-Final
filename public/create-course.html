@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Создать курс - Online Courses Platform</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">🎓 EduPlatform</a>
+            <div class="nav-links">
+                <a href="/">Главная</a>
+                <a href="/courses.html">Курсы</a>
+                <a href="/dashboard.html">Мои курсы</a>
+                <a href="/create-course.html" class="active">Создать курс</a>
+                <div class="auth-buttons" id="auth-buttons">
+                    <button onclick="logout()" class="btn btn-outline">Выйти</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Создать новый курс</h1>
+        
+        <form id="create-course-form" class="create-course-form">
+            <div class="form-section">
+                <h2>Основная информация</h2>
+                
+                <div class="form-group">
+                    <label for="course-title">Название курса *</label>
+                    <input type="text" id="course-title" name="title" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="course-description">Описание курса *</label>
+                    <textarea id="course-description" name="description" rows="4" required></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="course-category">Категория *</label>
+                        <select id="course-category" name="category" required>
+                            <option value="">Выберите категорию</option>
+                            <option value="programming">Программирование</option>
+                            <option value="design">Дизайн</option>
+                            <option value="business">Бизнес</option>
+                            <option value="marketing">Маркетинг</option>
+                            <option value="languages">Языки</option>
+                            <option value="other">Другое</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="course-level">Уровень сложности *</label>
+                        <select id="course-level" name="level" required>
+                            <option value="beginner">Начинающий</option>
+                            <option value="intermediate">Средний</option>
+                            <option value="advanced">Продвинутый</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="course-price">Цена ($) *</label>
+                        <input type="number" id="course-price" name="price" min="0" value="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="course-duration">Продолжительность (часы) *</label>
+                        <input type="number" id="course-duration" name="duration" min="1" value="10" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Требования и результаты</h2>
+                
+                <div class="form-group">
+                    <label for="course-requirements">Требования (каждое с новой строки)</label>
+                    <textarea id="course-requirements" name="requirements" rows="3" placeholder="Например:
+Базовые знания компьютера
+Установленный текстовый редактор"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="course-outcomes">Результаты обучения (каждое с новой строки)</label>
+                    <textarea id="course-outcomes" name="learningOutcomes" rows="3" placeholder="Например:
+Научитесь создавать веб-сайты
+Поймете основы JavaScript"></textarea>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg">Создать курс</button>
+                <button type="button" onclick="window.location.href='/dashboard.html'" class="btn btn-outline">Отмена</button>
+            </div>
+            
+            <div id="message" class="message"></div>
+        </form>
+    </div>
+
+    <script>
+            document.getElementById('create-course-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                title: document.getElementById('course-title').value,
+                description: document.getElementById('course-description').value,
+                category: document.getElementById('course-category').value,
+                level: document.getElementById('course-level').value,
+                price: parseFloat(document.getElementById('course-price').value),
+                duration: parseInt(document.getElementById('course-duration').value),
+                requirements: document.getElementById('course-requirements').value.split('\n').filter(line => line.trim()),
+                learningOutcomes: document.getElementById('course-outcomes').value.split('\n').filter(line => line.trim())
+            };
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/courses', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                const messageDiv = document.getElementById('message');
+                
+                if (data.success) {
+                    messageDiv.className = 'message success';
+                    messageDiv.innerHTML = `
+                        <p>✅ Курс успешно создан!</p>
+                        <p>ID курса: ${data.course?.id}</p>
+                        <a href="/dashboard.html" class="btn btn-primary">Перейти к моим курсам</a>
+                    `;
+                    
+                    document.getElementById('create-course-form').reset();
+                    document.getElementById('youtube-info').innerHTML = '';
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = `❌ Ошибка: ${data.message}`;
+                }
+            } catch (error) {
+                console.error('Error creating course:', error);
+                document.getElementById('message').className = 'message error';
+                document.getElementById('message').textContent = '❌ Ошибка сети. Проверьте подключение к серверу.';
+            }
+        });
+
+        
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/auth/check', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                const authButtons = document.getElementById('auth-buttons');
+                if (!authButtons) return;
+                
+                if (data.isAuthenticated) {
+                    authButtons.innerHTML = `
+                        <span>Привет, ${data.user.username}!</span>
+                        <a href="/dashboard.html" class="btn btn-outline">Личный кабинет</a>
+                        <button onclick="logout()" class="btn btn-outline">Выйти</button>
+                    `;
+                } else {
+                    window.location.href = '/login.html';
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+                window.location.href = '/login.html';
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout error:', error);
+                window.location.href = '/';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', checkAuth);
+    </script>
+</body>
+</html>

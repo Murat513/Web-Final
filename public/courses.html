@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Все курсы - Online Courses Platform</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">🎓 EduPlatform</a>
+            <div class="nav-links">
+                <a href="/">Главная</a>
+                <a href="/courses.html" class="active">Курсы</a>
+                <a href="/dashboard.html">Мои курсы</a>
+                <a href="/create-course.html">Создать курс</a>
+                <div class="auth-buttons" id="auth-buttons"></div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="courses-header">
+            <h1>Все курсы</h1>
+            <div class="search-filter">
+                <input type="text" id="search-input" placeholder="Поиск курсов...">
+                <select id="category-filter">
+                    <option value="">Все категории</option>
+                    <option value="programming">Программирование</option>
+                    <option value="design">Дизайн</option>
+                    <option value="business">Бизнес</option>
+                    <option value="marketing">Маркетинг</option>
+                    <option value="languages">Языки</option>
+                </select>
+                <select id="level-filter">
+                    <option value="">Все уровни</option>
+                    <option value="beginner">Начинающий</option>
+                    <option value="intermediate">Средний</option>
+                    <option value="advanced">Продвинутый</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="courses-grid" id="all-courses">
+            <!-- Курсы загружаются через JS -->
+        </div>
+
+        <div class="pagination" id="pagination">
+            <!-- Пагинация -->
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 Online Courses Platform</p>
+        </div>
+    </footer>
+
+    <script>
+        let currentPage = 1;
+        const coursesPerPage = 6;
+
+        async function loadCourses(page = 1) {
+            try {
+                const search = document.getElementById('search-input').value;
+                const category = document.getElementById('category-filter').value;
+                const level = document.getElementById('level-filter').value;
+                
+                let url = `/api/courses?page=${page}&limit=${coursesPerPage}`;
+                if (search) url += `&search=${encodeURIComponent(search)}`;
+                if (category) url += `&category=${category}`;
+                if (level) url += `&level=${level}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                const coursesGrid = document.getElementById('all-courses');
+                coursesGrid.innerHTML = '';
+                
+                if (data.success && data.courses && data.courses.length > 0) {
+                    data.courses.forEach(course => {
+                        const courseCard = `
+                            <div class="course-card">
+                                <div class="course-image">
+                                    <img src="https://images.unsplash.com/photo-1551650975-87deedd944c3?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="${course.title}">
+                                    ${course.price === 0 ? '<span class="free-badge">Бесплатно</span>' : ''}
+                                </div>
+                                <div class="course-content">
+                                    <h3>${course.title}</h3>
+                                    <p>${course.description.substring(0, 150)}...</p>
+                                    <div class="course-meta">
+                                        <span><i class="fas fa-user"></i> ${course.instructor}</span>
+                                        <span><i class="fas fa-clock"></i> ${course.duration} ч</span>
+                                        <span><i class="fas fa-signal"></i> ${course.level}</span>
+                                        <span><i class="fas fa-users"></i> ${course.studentsEnrolled} студентов</span>
+                                    </div>
+                                    <div class="course-footer">
+                                        <div class="rating">
+                                            <i class="fas fa-star"></i>
+                                            <span>${course.rating}</span>
+                                        </div>
+                                        <div>
+                                            <span class="price">${course.price === 0 ? 'Бесплатно' : `$${course.price}`}</span>
+                                            <a href="/course.html?id=${course.id}" class="btn btn-sm btn-primary">Подробнее</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        coursesGrid.innerHTML += courseCard;
+                    });
+                    
+                    // Пагинация
+                    renderPagination(data.totalPages, page);
+                } else {
+                    coursesGrid.innerHTML = '<div class="no-courses"><p>Курсы не найдены</p></div>';
+                }
+            } catch (error) {
+                console.error('Error loading courses:', error);
+            }
+        }
+        
+        function renderPagination(totalPages, currentPage) {
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+            
+            if (totalPages > 1) {
+                let html = '';
+                if (currentPage > 1) {
+                    html += `<button onclick="loadCourses(${currentPage - 1})" class="page-btn"><i class="fas fa-chevron-left"></i></button>`;
+                }
+                
+                for (let i = 1; i <= totalPages; i++) {
+                    if (i === currentPage) {
+                        html += `<button class="page-btn active">${i}</button>`;
+                    } else {
+                        html += `<button onclick="loadCourses(${i})" class="page-btn">${i}</button>`;
+                    }
+                }
+                
+                if (currentPage < totalPages) {
+                    html += `<button onclick="loadCourses(${currentPage + 1})" class="page-btn"><i class="fas fa-chevron-right"></i></button>`;
+                }
+                
+                pagination.innerHTML = html;
+            }
+        }
+        
+        // Загрузка курсов при загрузке страницы
+        loadCourses();
+        
+        // Поиск и фильтры
+        document.getElementById('search-input').addEventListener('input', () => {
+            currentPage = 1;
+            loadCourses(currentPage);
+        });
+        
+        document.getElementById('category-filter').addEventListener('change', () => {
+            currentPage = 1;
+            loadCourses(currentPage);
+        });
+        
+        document.getElementById('level-filter').addEventListener('change', () => {
+            currentPage = 1;
+            loadCourses(currentPage);
+        });
+    
+    async function checkAuth() {
+            try {
+                const response = await fetch('/api/auth/check', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                const authButtons = document.getElementById('auth-buttons');
+                
+                if (data.isAuthenticated) {
+                    authButtons.innerHTML = `
+                        <span>Привет, ${data.user.username}!</span>
+                        <a href="/dashboard.html" class="btn btn-outline">Личный кабинет</a>
+                        <button onclick="logout()" class="btn btn-outline">Выйти</button>
+                    `;
+                } else {
+                    authButtons.innerHTML = `
+                        <a href="/login.html" class="btn btn-outline">Войти</a>
+                        <a href="/register.html" class="btn btn-primary">Регистрация</a>
+                    `;
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', checkAuth);
+    </script>
+</body>
+</html> 

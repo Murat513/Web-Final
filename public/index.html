@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Courses Platform - Главная</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">🎓 EduPlatform</a>
+            <div class="nav-links">
+                <a href="/">Главная</a>
+                <a href="/courses.html">Курсы</a>
+                <a href="/dashboard.html">Мои курсы</a>
+                <a href="/create-course.html">Создать курс</a>
+                <div class="auth-buttons" id="auth-buttons"></div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1>Онлайн-образование нового поколения</h1>
+                <p>Изучайте программирование, дизайн, маркетинг и другие навыки с лучшими преподавателями</p>
+                <a href="/courses.html" class="btn btn-primary btn-lg">Начать обучение</a>
+            </div>
+            <div class="hero-image">
+                <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Обучение">
+            </div>
+        </div>
+    </section>
+
+    <section class="courses-section">
+        <div class="container">
+            <h2>Популярные курсы</h2>
+            <div class="courses-grid" id="featured-courses">
+            </div>
+            <a href="/courses.html" class="btn btn-outline">Все курсы</a>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+            <div class="feature">
+                <i class="fas fa-video"></i>
+                <h3>Видео-уроки</h3>
+                <p>Качественные видео от экспертов</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-certificate"></i>
+                <h3>Сертификаты</h3>
+                <p>Получите сертификат по окончании</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-users"></i>
+                <h3>Сообщество</h3>
+                <p>Общайтесь с другими студентами</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-laptop-code"></i>
+                <h3>Практика</h3>
+                <p>Реальные проекты и задания</p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 Online Courses Platform. Все права защищены.</p>
+        </div>
+    </footer>
+
+    <script src="/js/main.js"></script>
+    <script>
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/auth/check', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                const authButtons = document.getElementById('auth-buttons');
+                if (!authButtons) return;
+                
+                if (data.isAuthenticated) {
+                    authButtons.innerHTML = `
+                        <a href="/dashboard.html" class="btn btn-outline">Личный кабинет</a>
+                        <button onclick="logout()" class="btn btn-outline">Выйти</button>
+                    `;
+                } else {
+                    authButtons.innerHTML = `
+                        <a href="/login.html" class="btn btn-outline">Войти</a>
+                        <a href="/register.html" class="btn btn-primary">Регистрация</a>
+                    `;
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+
+        async function loadFeaturedCourses() {
+            try {
+                const response = await fetch('/api/courses');
+                const data = await response.json();
+                
+                const coursesGrid = document.getElementById('featured-courses');
+                if (data.success && data.courses) {
+                    coursesGrid.innerHTML = '';
+                    data.courses.slice(0, 3).forEach(course => {
+                        const courseCard = `
+                            <div class="course-card">
+                                <div class="course-image">
+                                    <img src="${course.thumbnail || 'https://images.unsplash.com/photo-1551650975-87deedd944c3?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80'}" alt="${course.title}">
+                                </div>
+                                <div class="course-content">
+                                    <h3>${course.title}</h3>
+                                    <p>${course.description.substring(0, 100)}...</p>
+                                    <div class="course-meta">
+                                        <span><i class="fas fa-user"></i> ${course.instructor}</span>
+                                        <span><i class="fas fa-clock"></i> ${course.duration} ч</span>
+                                        <span><i class="fas fa-signal"></i> ${course.level}</span>
+                                    </div>
+                                    <div class="course-footer">
+                                        <span class="price">${course.price === 0 ? 'Бесплатно' : `$${course.price}`}</span>
+                                        <a href="/course.html?id=${course.id}" class="btn btn-sm btn-primary">Подробнее</a>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        coursesGrid.innerHTML += courseCard;
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading courses:', error);
+            }
+        }
+        
+        // Загружаем и курсы и проверяем авторизацию
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            await loadFeaturedCourses();
+        });
+    </script>
+</body>
+</html>
