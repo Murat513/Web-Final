@@ -86,7 +86,7 @@
                         category: 'programming',
                         price: 0,
                         duration: 30,
-                        level: 'beginner',
+                        level: 'intermediate',
                         studentsEnrolled: 150,
                         rating: 4.5,
                         lessons: [],
