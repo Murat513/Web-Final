@@ -138,7 +138,7 @@
     function generateSessionId() {
         return 'session_' + generateId();
     }
-
+    
     app.post('/api/courses', async (req, res) => {
         if (!req.session.userId) {
             return res.status(401).json({
@@ -425,11 +425,44 @@
     });
 
     app.get('/courses', async (req, res) => {
+    console.log('🔵 GET /courses вызван с параметрами:', req.query);
+    
+    try {
         const loadedData = await data;
+        
+        // 1. Начинаем с опубликованных курсов
+        let courses = loadedData.courses.filter(course => course.isPublished);
+        
+        // 2. Фильтрация по категории
+        if (req.query.category && req.query.category !== '') {
+            courses = courses.filter(course => course.category === req.query.category);
+        }
+        
+        // 3. Фильтрация по уровню
+        if (req.query.level && req.query.level !== '') {
+            courses = courses.filter(course => course.level === req.query.level);
+        }
+        
+        // 4. Поиск
+        if (req.query.search && req.query.search.trim() !== '') {
+            const searchTerm = req.query.search.toLowerCase().trim();
+            courses = courses.filter(course => 
+                course.title.toLowerCase().includes(searchTerm) ||
+                (course.description && course.description.toLowerCase().includes(searchTerm))
+            );
+        }
+        
+        // 5. Пагинация
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 6;
+        const startIndex = (page - 1) * limit;
+        const endIndex = page * limit;
+        
+        const paginatedCourses = courses.slice(startIndex, endIndex);
         
         res.json({
             success: true,
-            courses: loadedData.courses.filter(course => course.isPublished).map(course => ({
+            courses: paginatedCourses.map(course => ({
                 id: course.id,
                 title: course.title,
                 description: course.description,
@@ -441,9 +474,21 @@
                 studentsEnrolled: course.studentsEnrolled,
                 rating: course.rating,
                 thumbnail: course.thumbnail
-            }))
+            })),
+            total: courses.length,
+            totalPages: Math.ceil(courses.length / limit),
+            page: page,
+            limit: limit
         });
-    });
+        
+    } catch (error) {
+        console.error('Ошибка в /courses:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Ошибка сервера'
+        });
+    }
+});
 
     app.get('/courses/:id', async (req, res) => {
         const loadedData = await data;
@@ -650,7 +695,6 @@
         }
     });
 
-
     app.get('/health', (req, res) => {
         res.json({
             success: true,
@@ -672,5 +716,7 @@
             }
         });
     }, 60 * 60 * 1000);
+
+    
 
     module.exports = app;
