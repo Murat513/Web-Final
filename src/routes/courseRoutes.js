@@ -1,25 +1,27 @@
 const express = require('express');
 const router = express.Router();
 const { 
-  createCourse,
-  getAllCourses,
-  getCourseById,
-  updateCourse,
-  deleteCourse,
-  addLesson,
-  publishCourse
+    createCourse,
+    getAllCourses,
+    getCourseById,
+    getMyCourses,
+    deleteCourse
 } = require('../controllers/courseController');
 const { protect, authorize } = require('../middleware/authMiddleware');
-const { validateCourse } = require('../middleware/validationMiddleware');
 
-router.post('/', protect, authorize('instructor', 'admin'), validateCourse, createCourse);
+// Все курсы (публичный)
 router.get('/', getAllCourses);
-router.get('/:id', getCourseById);
-router.put('/:id', protect, authorize('instructor', 'admin'), updateCourse);
-router.delete('/:id', protect, authorize('instructor', 'admin'), deleteCourse);
-router.post('/:id/lessons', protect, authorize('instructor', 'admin'), addLesson);
-router.put('/:id/publish', protect, authorize('instructor', 'admin'), publishCourse);
-const { suggestYouTubeVideos } = require('../controllers/courseController');
 
-router.get('/:id/youtube-suggestions', protect, authorize('instructor', 'admin'), suggestYouTubeVideos);
+// Мои курсы (инструктор)
+router.get('/my', protect, getMyCourses);
+
+// Создание курса (инструктор)
+router.post('/', protect, authorize('instructor', 'admin'), createCourse);
+
+// Курс по ID
+router.get('/:id', getCourseById);
+
+// Удаление курса (инструктор)
+router.delete('/:id', protect, authorize('instructor', 'admin'), deleteCourse);
+
 module.exports = router;

@@ -16,9 +16,7 @@
                 <a href="/courses.html">Курсы</a>
                 <a href="/dashboard.html">Мои курсы</a>
                 <a href="/create-course.html">Создать курс</a>
-                <div class="auth-buttons" id="auth-buttons">
-                    <!-- Динамически загружается -->
-                </div>
+                <div class="auth-buttons" id="auth-buttons"></div>
             </div>
         </div>
     </nav>
@@ -36,6 +34,9 @@
     </footer>
 
     <script>
+        let currentUser = null;
+        let currentCourse = null;
+
         // Функция проверки авторизации
         async function checkAuth() {
             try {
@@ -47,11 +48,14 @@
                 const authButtons = document.getElementById('auth-buttons');
                 
                 if (data.isAuthenticated) {
+                    currentUser = data.user;
                     authButtons.innerHTML = `
                         <span>Привет, ${data.user.username}!</span>
+                        <a href="/dashboard.html" class="btn btn-outline">Личный кабинет</a>
                         <button onclick="logout()" class="btn btn-outline">Выйти</button>
                     `;
                 } else {
+                    currentUser = null;
                     authButtons.innerHTML = `
                         <a href="/login.html" class="btn btn-outline">Войти</a>
                         <a href="/register.html" class="btn btn-primary">Регистрация</a>
@@ -78,6 +82,39 @@
             }
         }
 
+        // Функция отписки от курса
+        window.unenrollFromCourse = async function(courseId) {
+            if (!confirm('Вы уверены, что хотите отписаться от этого курса?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/enroll/my-courses', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                const enrollment = data.enrollments.find(e => e.course.id === courseId);
+                
+                if (enrollment) {
+                    const unenrollResponse = await fetch(`/api/enroll/${enrollment.enrollmentId}`, {
+                        method: 'DELETE',
+                        credentials: 'include'
+                    });
+                    
+                    const result = await unenrollResponse.json();
+                    
+                    if (result.success) {
+                        alert('Вы успешно отписались от курса!');
+                        window.location.reload();
+                    }
+                }
+            } catch (error) {
+                console.error('Error unenrolling:', error);
+                alert('Ошибка при отписке от курса');
+            }
+        };
+
         // Загрузка деталей курса
         async function loadCourseDetails() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -97,11 +134,12 @@
                 if (data.success) {
                     const course = data.course;
                     const isEnrolled = data.isEnrolled;
+                    currentCourse = course;
                     
                     document.getElementById('course-details').innerHTML = `
                         <div class="course-detail-header">
                             <div class="course-detail-image">
-                                <img src="${course.thumbnail}" alt="${course.title}">
+                                <img src="${course.thumbnail || 'https://images.unsplash.com/photo-1551650975-87deedd944c3?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80'}" alt="${course.title}">
                             </div>
                             <div class="course-detail-info">
                                 <h1>${course.title}</h1>
@@ -140,8 +178,15 @@
                                 <div class="course-price">
                                     <h2>${course.price === 0 ? 'Бесплатно' : `$${course.price}`}</h2>
                                     ${isEnrolled ? 
-                                        '<button class="btn btn-success btn-lg" disabled>✓ Вы уже записаны</button>' :
-                                        `<button onclick="enrollInCourse('${course.id}')" class="btn btn-primary btn-lg">Записаться на курс</button>`
+                                        `<div class="enrolled-actions">
+                                            <button class="btn btn-success btn-lg" disabled>✓ Вы записаны</button>
+                                            <button onclick="unenrollFromCourse('${course.id}')" class="btn btn-outline-danger btn-lg">
+                                                <i class="fas fa-sign-out-alt"></i> Отписаться
+                                            </button>
+                                         </div>` :
+                                        `<button onclick="enrollInCourse('${course.id}')" class="btn btn-primary btn-lg">
+                                            <i class="fas fa-user-plus"></i> Записаться на курс
+                                         </button>`
                                     }
                                 </div>
                             </div>
@@ -181,8 +226,8 @@
                                                     <span class="lesson-duration"><i class="fas fa-clock"></i> ${lesson.duration} минут</span>
                                                 </div>
                                                 ${isEnrolled ? 
-                                                    '<button class="btn btn-sm btn-outline">Начать урок</button>' :
-                                                    '<button class="btn btn-sm btn-outline" disabled>Запишитесь на курс</button>'
+                                                    '<button class="btn btn-sm btn-outline-primary">Начать урок</button>' :
+                                                    '<button class="btn btn-sm btn-outline-secondary" disabled>Запишитесь на курс</button>'
                                                 }
                                             </div>
                                         `).join('') :
@@ -190,25 +235,6 @@
                                     }
                                 </div>
                             </div>
-                            
-                            ${course.instructorInfo ? `
-                                <div class="section">
-                                    <h2><i class="fas fa-chalkboard-teacher"></i> Об инструкторе</h2>
-                                    <div class="instructor-card">
-                                        <div class="instructor-avatar">
-                                            <i class="fas fa-user-circle"></i>
-                                        </div>
-                                        <div class="instructor-info">
-                                            <h3>${course.instructorInfo.fullName}</h3>
-                                            <p class="instructor-bio">${course.instructorInfo.bio || 'Информация об инструкторе'}</p>
-                                            <div class="instructor-stats">
-                                                <span><i class="fas fa-graduation-cap"></i> Инструктор</span>
-                                                <span><i class="fas fa-users"></i> ${course.studentsEnrolled} студентов</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ` : ''}
                         </div>
                     `;
                 } else {
@@ -222,6 +248,13 @@
                 }
             } catch (error) {
                 console.error('Error loading course details:', error);
+                document.getElementById('course-details').innerHTML = `
+                    <div class="error-message">
+                        <h2>Ошибка загрузки</h2>
+                        <p>Не удалось загрузить информацию о курсе.</p>
+                        <a href="/courses.html" class="btn btn-primary">Вернуться к курсам</a>
+                    </div>
+                `;
             }
         }
 
@@ -257,46 +290,6 @@
         }
 
         init();
-         async function checkAuth() {
-        try {
-            const response = await fetch('/api/auth/check', {
-                credentials: 'include'
-            });
-            const data = await response.json();
-            
-            const authButtons = document.getElementById('auth-buttons');
-            if (!authButtons) return;
-            
-            if (data.isAuthenticated) {
-                authButtons.innerHTML = `
-                    <span>Привет, ${data.user.username}!</span>
-                    <a href="/dashboard.html" class="btn btn-outline">Личный кабинет</a>
-                    <button onclick="logout()" class="btn btn-outline">Выйти</button>
-                `;
-            } else {
-                authButtons.innerHTML = `
-                    <a href="/login.html" class="btn btn-outline">Войти</a>
-                    <a href="/register.html" class="btn btn-primary">Регистрация</a>
-                `;
-            }
-        } catch (error) {
-            console.error('Auth check error:', error);
-        }
-    }
-
-    async function logout() {
-        try {
-            await fetch('/api/auth/logout', {
-                method: 'POST',
-                credentials: 'include'
-            });
-            window.location.href = '/';
-        } catch (error) {
-            console.error('Logout error:', error);
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', checkAuth);
     </script>
 
     <style>
@@ -367,6 +360,12 @@
             margin-bottom: 1rem;
         }
         
+        .enrolled-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+        
         .btn-success {
             background-color: #2ecc71;
             color: white;
@@ -375,6 +374,17 @@
         
         .btn-success:hover {
             background-color: #27ae60;
+        }
+        
+        .btn-outline-danger {
+            border: 2px solid #dc3545;
+            color: #dc3545;
+            background: transparent;
+        }
+        
+        .btn-outline-danger:hover {
+            background: #dc3545;
+            color: white;
         }
         
         .course-sections {
@@ -484,38 +494,22 @@
             gap: 0.3rem;
         }
         
-        .instructor-card {
-            display: flex;
-            gap: 2rem;
-            align-items: center;
-        }
-        
-        .instructor-avatar {
-            font-size: 4rem;
+        .btn-outline-primary {
+            border: 1px solid #3498db;
             color: #3498db;
+            background: transparent;
         }
         
-        .instructor-info h3 {
-            margin-bottom: 0.5rem;
-            color: #2c3e50;
+        .btn-outline-primary:hover {
+            background: #3498db;
+            color: white;
         }
         
-        .instructor-bio {
-            color: #666;
-            line-height: 1.6;
-            margin-bottom: 1rem;
-        }
-        
-        .instructor-stats {
-            display: flex;
-            gap: 1.5rem;
-            color: #7f8c8d;
-        }
-        
-        .instructor-stats span {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+        .btn-outline-secondary {
+            border: 1px solid #95a5a6;
+            color: #95a5a6;
+            background: transparent;
+            cursor: not-allowed;
         }
         
         .error-message {
@@ -536,8 +530,35 @@
             .course-meta-detail {
                 grid-template-columns: 1fr;
             }
+            
+            .enrolled-actions {
+                flex-direction: column;
+            }
         }
 
+        /* Стили для бейджа подписки */
+        .enrolled-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        .enrolled-status {
+            color: #28a745;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .course-image {
+            position: relative;
+        }
     </style>
 </body>
 </html>

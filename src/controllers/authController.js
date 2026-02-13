@@ -1,126 +1,159 @@
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { generateSessionId } = require('../middleware/authMiddleware');
 
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '30d'
-  });
-};
-
-exports.register = async (req, res, next) => {
-  try {
-    const { username, email, password, fullName, role } = req.body;
-
-    const userExists = await User.findOne({ 
-      $or: [{ email }, { username }] 
-    });
-
-    if (userExists) {
-      return res.status(400).json({
-        success: false,
-        message: 'User with this email or username already exists'
-      });
+const register = async (req, res) => {
+    try {
+        const { username, email, password, fullName, role = 'student' } = req.body;
+        
+        const existingUser = await User.findOne({ 
+            $or: [{ email }, { username }] 
+        });
+        
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'Пользователь уже существует'
+            });
+        }
+        
+        const newUser = new User({
+            username,
+            email,
+            password,
+            fullName,
+            role,
+            bio: '',
+            avatar: 'default-avatar.jpg',
+            createdAt: new Date()
+        });
+        
+        await newUser.save();
+        
+        const sessionId = generateSessionId();
+        req.session.userId = newUser._id.toString();
+        req.session.userRole = newUser.role;
+        req.session._createdAt = Date.now();
+        res.locals.sessionId = sessionId;
+        
+        res.cookie('sessionId', sessionId, {
+            maxAge: 24 * 60 * 60 * 1000,
+            httpOnly: false,
+            sameSite: 'lax'
+        });
+        
+        res.json({
+            success: true,
+            message: 'Регистрация успешна',
+            user: {
+                id: newUser._id,
+                username: newUser.username,
+                email: newUser.email,
+                fullName: newUser.fullName,
+                role: newUser.role
+            }
+        });
+        
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Ошибка сервера при регистрации'
+        });
     }
-
-    const user = await User.create({
-      username,
-      email,
-      password,
-      fullName,
-      role: role || 'student'
-    });
-
-    const token = generateToken(user._id);
-
-    res.status(201).json({
-      success: true,
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
 };
 
-exports.login = async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-
-    const user = await User.findOne({ email }).select('+password');
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        
+        const user = await User.findOne({ email, password });
+        
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Неверный email или пароль'
+            });
+        }
+        
+        const sessionId = generateSessionId();
+        req.session.userId = user._id.toString();
+        req.session.userRole = user.role;
+        req.session._createdAt = Date.now();
+        res.locals.sessionId = sessionId;
+        
+        res.cookie('sessionId', sessionId, {
+            maxAge: 24 * 60 * 60 * 1000,
+            httpOnly: false,
+            sameSite: 'lax'
+        });
+        
+        res.json({
+            success: true,
+            message: 'Вход выполнен',
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                fullName: user.fullName,
+                role: user.role
+            }
+        });
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Ошибка сервера при входе'
+        });
     }
+};
 
-    const isPasswordMatch = await user.comparePassword(password);
-
-    if (!isPasswordMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+const logout = (req, res) => {
+    const sessionId = req.cookies?.sessionId;
+    if (sessionId) {
+        const { sessions } = require('../middleware/authMiddleware');
+        delete sessions[sessionId];
     }
-
-    const token = generateToken(user._id);
-
-    res.status(200).json({
-      success: true,
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role
-      }
+    
+    res.clearCookie('sessionId');
+    res.json({
+        success: true,
+        message: 'Выход выполнен'
     });
-  } catch (error) {
-    next(error);
-  }
 };
 
-exports.getProfile = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user.id);
-
-    res.status(200).json({
-      success: true,
-      user
+const checkAuth = async (req, res) => {
+    if (req.session.userId) {
+        try {
+            const user = await User.findById(req.session.userId);
+            if (user) {
+                return res.json({
+                    success: true,
+                    isAuthenticated: true,
+                    user: {
+                        id: user._id,
+                        username: user.username,
+                        email: user.email,
+                        fullName: user.fullName,
+                        role: user.role
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Auth check error:', error);
+        }
+    }
+    
+    res.json({
+        success: true,
+        isAuthenticated: false,
+        user: null
     });
-  } catch (error) {
-    next(error);
-  }
 };
 
-exports.updateProfile = async (req, res, next) => {
-  try {
-    const { fullName, bio, avatar } = req.body;
-
-    const updateData = {};
-    if (fullName) updateData.fullName = fullName;
-    if (bio !== undefined) updateData.bio = bio;
-    if (avatar) updateData.avatar = avatar;
-
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      updateData,
-      { new: true, runValidators: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      user
-    });
-  } catch (error) {
-    next(error);
-  }
+module.exports = {
+    register,
+    login,
+    logout,
+    checkAuth
 };

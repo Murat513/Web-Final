@@ -131,17 +131,24 @@
                 const data = await response.json();
                 const messageDiv = document.getElementById('message');
                 
-                if (data.success) {
-                    messageDiv.className = 'message success';
-                    messageDiv.innerHTML = `
-                        <p>✅ Курс успешно создан!</p>
-                        <p>ID курса: ${data.course?.id}</p>
-                        <a href="/dashboard.html" class="btn btn-primary">Перейти к моим курсам</a>
-                    `;
-                    
-                    document.getElementById('create-course-form').reset();
-                    document.getElementById('youtube-info').innerHTML = '';
-                } else {
+                    if (data.success) {
+                        const messageDiv = document.getElementById('message');
+                        if (messageDiv) {  // ✅ ПРОВЕРЯЕМ СУЩЕСТВОВАНИЕ
+                            messageDiv.className = 'message success';
+                            messageDiv.innerHTML = `
+                                <p>✅ Курс успешно создан!</p>
+                                <p>ID курса: ${data.course?.id || data.course?._id}</p>
+                                <a href="/dashboard.html" class="btn btn-primary">Перейти к моим курсам</a>
+                            `;
+                        }
+    
+                        document.getElementById('create-course-form').reset();
+                        
+                        const youtubeInfo = document.getElementById('youtube-info');
+                        if (youtubeInfo) {  // ✅ ПРОВЕРЯЕМ СУЩЕСТВОВАНИЕ
+                            youtubeInfo.innerHTML = '';
+                        }
+                    } else {
                     messageDiv.className = 'message error';
                     messageDiv.textContent = `❌ Ошибка: ${data.message}`;
                 }

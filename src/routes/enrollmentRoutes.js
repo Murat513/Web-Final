@@ -1,18 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const { 
-  enrollInCourse,
-  getMyCourses,
-  updateProgress,
-  unenrollFromCourse,
-  getEnrollmentDetails
+const {
+    enrollCourse,
+    getMyEnrollments,
+    getCreatedCourses,
+    unenrollCourse
 } = require('../controllers/enrollmentController');
 const { protect } = require('../middleware/authMiddleware');
 
-router.post('/:courseId', protect, enrollInCourse);
-router.get('/my-courses', protect, getMyCourses);
-router.put('/:id/progress', protect, updateProgress);
-router.delete('/:id', protect, unenrollFromCourse);
-router.get('/:id', protect, getEnrollmentDetails);
+// Все маршруты защищены
+router.use(protect);
+
+router.post('/:courseId', enrollCourse);
+router.get('/my-courses', getMyEnrollments);
+router.get('/created-courses', getCreatedCourses);  // ✅ Добавлен маршрут
+router.delete('/:enrollmentId', unenrollCourse);
 
 module.exports = router;

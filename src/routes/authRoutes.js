@@ -1,17 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const { 
-  register, 
-  login, 
-  getProfile, 
-  updateProfile 
+const {
+    register,
+    login,
+    logout,
+    checkAuth,
+    getProfile
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
-const { validateRegister, validateLogin } = require('../middleware/validationMiddleware');
 
-router.post('/register', validateRegister, register);
-router.post('/login', validateLogin, login);
-router.get('/profile', protect, getProfile);
-router.put('/profile', protect, updateProfile);
+// Публичные маршруты
+router.post('/register', register);
+router.post('/login', login);
+router.post('/logout', logout);
+router.get('/check', checkAuth);
+
 
 module.exports = router;
