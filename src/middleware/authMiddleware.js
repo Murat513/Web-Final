@@ -1,6 +1,12 @@
-// Сессии в памяти
+const jwt = require('jsonwebtoken');
+
+// Секретный ключ для JWT (в продакшене должен быть в .env)
+const JWT_SECRET = 'your-super-secret-jwt-key-2026';
+
+// Сессии в памяти (оставляем для совместимости)
 let sessions = {};
 
+// Middleware для сессий (старый способ)
 const sessionMiddleware = (req, res, next) => {
     const sessionId = req.cookies?.sessionId;
     
@@ -12,7 +18,6 @@ const sessionMiddleware = (req, res, next) => {
     
     res.locals.sessionId = sessionId;
     
-    // Сохраняем сессию
     const originalEnd = res.end;
     res.end = function(...args) {
         if (res.locals.sessionId && Object.keys(req.session).length > 0) {
@@ -24,8 +29,32 @@ const sessionMiddleware = (req, res, next) => {
     next();
 };
 
+// Middleware для JWT (новый способ)
+const jwtMiddleware = (req, res, next) => {
+    try {
+        // Проверяем JWT в cookies
+        const token = req.cookies?.token;
+        
+        if (token) {
+            const decoded = jwt.verify(token, JWT_SECRET);
+            req.user = decoded;
+            
+            // Для совместимости со старым кодом
+            req.session.userId = decoded.id;
+            req.session.userRole = decoded.role;
+        }
+    } catch (error) {
+        // Невалидный токен - просто игнорируем
+        console.log('JWT verification failed:', error.message);
+    }
+    next();
+};
+
+// Защита маршрутов (работает и с сессиями, и с JWT)
 const protect = (req, res, next) => {
-    if (!req.session.userId) {
+    const isAuthenticated = req.session?.userId || req.user?.id;
+    
+    if (!isAuthenticated) {
         return res.status(401).json({
             success: false,
             message: 'Требуется авторизация'
@@ -34,9 +63,12 @@ const protect = (req, res, next) => {
     next();
 };
 
+// Авторизация по ролям
 const authorize = (...roles) => {
     return (req, res, next) => {
-        if (!req.session.userRole || !roles.includes(req.session.userRole)) {
+        const userRole = req.user?.role || req.session?.userRole;
+        
+        if (!userRole || !roles.includes(userRole)) {
             return res.status(403).json({
                 success: false,
                 message: 'Нет прав доступа'
@@ -46,8 +78,22 @@ const authorize = (...roles) => {
     };
 };
 
+// Генерация ID для сессии
 function generateSessionId() {
     return 'session_' + Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// Генерация JWT токена
+function generateToken(user) {
+    return jwt.sign(
+        { 
+            id: user._id.toString(), 
+            role: user.role,
+            username: user.username 
+        },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+    );
 }
 
 // Очистка старых сессий
@@ -63,7 +109,10 @@ setInterval(() => {
 module.exports = {
     sessions,
     sessionMiddleware,
+    jwtMiddleware,
     protect,
     authorize,
-    generateSessionId
+    generateSessionId,
+    generateToken,
+    JWT_SECRET
 };

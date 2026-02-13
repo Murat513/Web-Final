@@ -25,11 +25,29 @@
         <div id="course-details">
             <!-- Загружается через JS -->
         </div>
+        
+        <!-- ========== YOUTUBE SECTION ========== -->
+        <div id="youtube-section" style="display: none; margin-top: 30px;">
+            <div class="section">
+                <h2 style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fab fa-youtube" style="color: #ff0000;"></i> 
+                    Рекомендуемые видео по теме
+                    <button onclick="hideYouTubeSection()" style="margin-left: auto; background: none; border: none; font-size: 20px; cursor: pointer;">&times;</button>
+                </h2>
+                <div id="youtube-videos" class="video-grid">
+                    <!-- Видео загружаются сюда -->
+                </div>
+                <div id="youtube-loading" style="display: none; text-align: center; padding: 40px;">
+                    <i class="fas fa-spinner fa-spin fa-3x"></i>
+                    <p>Загрузка видео...</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <footer>
         <div class="container">
-            <p>&copy; 2024 Online Courses Platform</p>
+            <p>&copy; 2026 Online Courses Platform</p>
         </div>
     </footer>
 
@@ -115,6 +133,57 @@
             }
         };
 
+        // ========== YOUTUBE API FUNCTION ==========
+        window.searchYouTube = async function(query) {
+            if (!query) return;
+            
+            const section = document.getElementById('youtube-section');
+            const container = document.getElementById('youtube-videos');
+            const loading = document.getElementById('youtube-loading');
+            
+            try {
+                section.style.display = 'block';
+                loading.style.display = 'block';
+                container.innerHTML = '';
+                
+                const response = await fetch(`/api/youtube/search?query=${encodeURIComponent(query)}`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                loading.style.display = 'none';
+                
+                if (data.success && data.videos && data.videos.length > 0) {
+                    container.innerHTML = data.videos.map(video => `
+                        <div class="video-card">
+                            <a href="${video.url}" target="_blank">
+                                <div class="video-thumbnail">
+                                    <img src="${video.thumbnail}" alt="${video.title}">
+                                    <span class="play-icon"><i class="fas fa-play"></i></span>
+                                </div>
+                                <div class="video-info">
+                                    <h4>${video.title.length > 60 ? video.title.substring(0, 60) + '...' : video.title}</h4>
+                                    <p class="video-channel">${video.channel}</p>
+                                    <p class="video-description">${video.description ? video.description.substring(0, 80) + '...' : 'Нет описания'}</p>
+                                </div>
+                            </a>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div class="no-videos"><p>😕 Видео не найдены. Попробуйте другой запрос.</p></div>';
+                }
+            } catch (error) {
+                console.error('YouTube search error:', error);
+                loading.style.display = 'none';
+                container.innerHTML = '<div class="no-videos"><p>❌ Ошибка при загрузке видео. Попробуйте позже.</p></div>';
+            }
+        };
+
+        // Скрыть секцию YouTube
+        window.hideYouTubeSection = function() {
+            document.getElementById('youtube-section').style.display = 'none';
+        };
+
         // Загрузка деталей курса
         async function loadCourseDetails() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -177,17 +246,23 @@
                                 
                                 <div class="course-price">
                                     <h2>${course.price === 0 ? 'Бесплатно' : `$${course.price}`}</h2>
-                                    ${isEnrolled ? 
-                                        `<div class="enrolled-actions">
-                                            <button class="btn btn-success btn-lg" disabled>✓ Вы записаны</button>
-                                            <button onclick="unenrollFromCourse('${course.id}')" class="btn btn-outline-danger btn-lg">
-                                                <i class="fas fa-sign-out-alt"></i> Отписаться
-                                            </button>
-                                         </div>` :
-                                        `<button onclick="enrollInCourse('${course.id}')" class="btn btn-primary btn-lg">
-                                            <i class="fas fa-user-plus"></i> Записаться на курс
-                                         </button>`
-                                    }
+                                    <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                                        ${isEnrolled ? 
+                                            `<div class="enrolled-actions">
+                                                <button class="btn btn-success" disabled>✓ Вы записаны</button>
+                                                <button onclick="unenrollFromCourse('${course.id}')" class="btn btn-outline-danger">
+                                                    <i class="fas fa-sign-out-alt"></i> Отписаться
+                                                </button>
+                                             </div>` :
+                                            `<button onclick="enrollInCourse('${course.id}')" class="btn btn-primary">
+                                                <i class="fas fa-user-plus"></i> Записаться на курс
+                                             </button>`
+                                        }
+                                        <!-- ========== YOUTUBE BUTTON ========== -->
+                                        <button onclick="searchYouTube('${course.title}')" class="btn btn-danger" style="background: #ff0000; border-color: #ff0000;">
+                                            <i class="fab fa-youtube"></i> Видео по теме
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
